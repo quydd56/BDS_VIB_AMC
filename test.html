@@ -116,27 +116,8 @@
 
     <div id="map-container"></div>
 
-    <script>
+<script>
         let map; // Biến toàn cục để lưu instance Google Map
-
-        // Khai báo 2 bộ màu (JSON Array) cho bản đồ
-        const silverStyle = [
-            { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
-            { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-            { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
-            { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
-            { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] }
-        ];
-
-        const darkStyle = [
-            { elementType: "geometry", stylers: [{ color: "#09101d" }] },
-            { elementType: "labels.text.stroke", stylers: [{ visibility: "off" }] },
-            { elementType: "labels.text.fill", stylers: [{ color: "#45546b" }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#040810" }] },
-            { featureType: "road", elementType: "geometry", stylers: [{ color: "#141c2b" }] },
-            { featureType: "poi", stylers: [{ visibility: "off" }] }
-        ];
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -145,21 +126,17 @@
             toggleBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
         }
 
-        // Hàm xử lý khi bấm nút chuyển đổi Map
+        // Hàm xử lý khi bấm nút chuyển đổi Map (ĐÃ SỬA ĐỂ KHÔNG XUNG ĐỘT MAP ID)
         function changeMapStyle(mode) {
-            // Đổi trạng thái active cho các nút bấm
             document.querySelectorAll('.style-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${mode}`).classList.add('active');
 
-            if (mode === 'silver') {
+            // Khi dùng Map ID, mọi việc đổi màu phải cấu hình trên Cloud Console.
+            // Ở đây ta chỉ chuyển đổi loại bản đồ cơ bản.
+            if (mode === 'silver' || mode === 'dark') {
                 map.setMapTypeId('roadmap');
-                map.setOptions({ styles: silverStyle });
-            } else if (mode === 'dark') {
-                map.setMapTypeId('roadmap');
-                map.setOptions({ styles: darkStyle });
             } else if (mode === 'satellite') {
                 map.setMapTypeId('satellite');
-                map.setOptions({ styles: null }); // Xóa lớp phủ màu để hiện ảnh vệ tinh
             }
         }
 
@@ -181,13 +158,14 @@
                 tbody.appendChild(tr);
             });
 
-            // Khởi tạo Google Maps (Mặc định dùng Silver Style)
+            // Khởi tạo Google Maps (ĐÃ XÓA THUỘC TÍNH STYLES)
             map = new google.maps.Map(document.getElementById('map-container'), {
                 center: { lat: 10.7626, lng: 106.7000 },
-                zoom: 12.5, pitch: 50, bearing: 15,
-                mapId:'93c50cf0208605b41990395b',
+                zoom: 13, // Tăng zoom lên một chút để dễ nhìn thấy các tòa nhà 3D
+                pitch: 55, // Tăng độ nghiêng lên 55 độ
+                bearing: 15,
+                mapId: '93c50cf0208605b41990395b',
                 mapTypeId: 'roadmap',
-                styles: silverStyle,
                 disableDefaultUI: true
             });
 
