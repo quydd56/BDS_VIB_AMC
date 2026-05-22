@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VIB Collateral Advanced 3D Map</title>
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
@@ -23,14 +23,15 @@
 
         #map-container { width: 100%; height: 100%; position: absolute; z-index: 1; }
 
-        /* Sidebar điều khiển bên trái */
+        /* Sidebar điều khiển bên trái (Mặc định cho Desktop) */
         #sidebar {
             position: absolute; top: 20px; left: 20px; bottom: 20px; width: 380px;
             background: var(--panel-bg); border: 1px solid var(--border-color);
             border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             z-index: 10; display: flex; flex-direction: column;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        
         #sidebar.hidden { transform: translateX(-110%); pointer-events: none; }
 
         .header {
@@ -54,7 +55,7 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.1); display: none;
         }
 
-        /* --- THANH CHUYỂN ĐỔI BẢN ĐỒ BÊN DƯỚI --- */
+        /* --- THANH CHUYỂN ĐỔI BẢN ĐỒ BÊN DƯỚI (Mặc định cho Desktop) --- */
         .map-style-controls {
             position: absolute;
             bottom: 30px;
@@ -67,6 +68,7 @@
             padding: 4px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
         }
         .style-btn {
             background: transparent; border: none; padding: 8px 20px;
@@ -87,11 +89,49 @@
         }
 
         .gmnoprint, .gm-style-cc { display: none !important; }
+
+        /* =========================================================
+           ĐOẠN CODE MA THUẬT: TƯƠNG THÍCH ĐIỆN THOẠI & TABLET 
+           ========================================================= */
+        @media (max-width: 768px) {
+            /* 1. Biến Sidebar thành Bottom Sheet (Vuốt từ dưới lên) */
+            #sidebar {
+                width: 100%;
+                left: 0; right: 0; bottom: 0; top: auto;
+                height: 45%; /* Chỉ chiếm chưa tới nửa dưới màn hình */
+                border-radius: 20px 20px 0 0; /* Bo tròn 2 góc trên cho đẹp */
+                border-left: none; border-right: none; border-bottom: none;
+                transform: translateY(0); /* Mặc định nằm ở dưới đáy */
+            }
+
+            /* Đổi hướng ẩn: Vuốt tuột xuống dưới đáy thay vì sang trái */
+            #sidebar.hidden { transform: translateY(110%); }
+
+            .header { border-radius: 20px 20px 0 0; }
+
+            /* 2. Đẩy cụm nút chọn bản đồ lên góc TRÊN CÙNG để không bị ngón tay che */
+            .map-style-controls {
+                bottom: auto;
+                top: 20px;
+                width: 90%;
+                justify-content: center;
+                flex-wrap: wrap; /* Nếu màn hình quá hẹp, các nút sẽ tự rớt dòng */
+                gap: 4px;
+            }
+
+            .style-btn {
+                padding: 6px 12px;
+                font-size: 11px; /* Thu nhỏ chữ lại một chút */
+            }
+
+            /* 3. Chỉnh lại nút Toggle để luôn nằm ở góc thoáng */
+            #toggle-btn { top: 80px; left: 15px; }
+        }
     </style>
 </head>
 <body>
 
-    <button id="toggle-btn" onclick="toggleSidebar()">☰ Hiển thị bảng dữ liệu</button>
+    <button id="toggle-btn" onclick="toggleSidebar()">☰ Bảng điều khiển</button>
 
     <div id="sidebar">
         <div class="header">
@@ -108,7 +148,7 @@
                 <div class="stat-value">1,450 Tỷ</div>
             </div>
             <p style="font-size: 12px; color: #6b7280; line-height: 1.6; margin-top: 20px;">
-                💡 <b>Mẹo tương tác:</b> Hãy cuộn chuột (Zoom in) sâu xuống khu vực Quận 1 hoặc Bình Thạnh để xem các điểm tài sản tự động phân rã từ cấp Quận -> Phường -> Từng căn bất động sản.
+                💡 <b>Mẹo tương tác:</b> Hãy cuộn chuột (hoặc dùng 2 ngón tay zoom trên điện thoại) sâu xuống khu vực Quận 1 để xem chi tiết từng tài sản và khối nhà 3D.
             </p>
         </div>
     </div>
@@ -131,27 +171,19 @@
             toggleBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
         }
 
-        // Hàm xử lý đổi loại bản đồ
         function changeMapStyle(mode) {
             document.querySelectorAll('.style-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${mode}`).classList.add('active');
-            
-            // Chuyển đổi trực tiếp thông qua mapTypeId
             map.setMapTypeId(mode);
         }
 
         function initMap() {
             const collateralLocations = [
-                // Cụm Quận 1
                 { lat: 10.7712, lng: 106.7042, name: "TSĐB #Q1-001 (Căn hộ chung cư cao cấp)", value: "150 Tỷ" },
                 { lat: 10.7725, lng: 106.7058, name: "TSĐB #Q1-002 (Nhà phố mặt tiền thương mại)", value: "220 Tỷ" },
                 { lat: 10.7701, lng: 106.7030, name: "TSĐB #Q1-003 (Tòa nhà văn phòng)", value: "480 Tỷ" },
-                
-                // Cụm Bình Thạnh
                 { lat: 10.7940, lng: 106.7215, name: "TSĐB #BT-001 (Biệt thự Vinhomes)", value: "310 Tỷ" },
                 { lat: 10.7955, lng: 106.7230, name: "TSĐB #BT-002 (Căn hộ tầng cao Landmark)", value: "90 Tỷ" },
-
-                // Cụm TP. Thủ Đức
                 { lat: 10.8040, lng: 106.7333, name: "TSĐB #TD-001 (Bất động sản phức hợp)", value: "450 Tỷ" },
                 { lat: 10.8055, lng: 106.7350, name: "TSĐB #TD-002 (Biệt thự ven sông)", value: "200 Tỷ" }
             ];
@@ -162,11 +194,10 @@
                 pitch: 55,     
                 bearing: 30,   
                 mapId: '93c50cf0208605b41990395b', 
-                mapTypeId: 'roadmap', // Mặc định là Bản đồ chuẩn
+                mapTypeId: 'roadmap',
                 disableDefaultUI: true
             });
 
-            // Sử dụng hình ảnh PNG trong suốt
             const pinIcon3D = {
                 url: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', 
                 scaledSize: new google.maps.Size(40, 40),
