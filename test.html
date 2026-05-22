@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collateral Map - Multi-Style 3D</title>
+    <script src="https://unpkg.com/deck.gl@8.9.0/dist.min.js"></script>
+    <script src="https://unpkg.com/@deck.gl/google-maps@8.9.0/dist.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --corporate-blue: #003087;
+            --text-main: #1f2937;
+            --border-color: #e5e7eb;
+            --bg-panel: #ffffff;
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+
+        #map-container { width: 100%; height: 100%; position: absolute; z-index: 1; }
+
+        /* Bảng điều khiển bên trái */
+        #sidebar {
+            position: absolute; top: 20px; left: 20px; bottom: 20px; width: 380px;
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10; display: flex; flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+        #sidebar.hidden { transform: translateX(-110%); pointer-events: none; }
+
+        .header {
+            background-color: var(--corporate-blue); color: #fff;
+            padding: 16px 20px; border-radius: 6px 6px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header h2 { margin: 0; font-size: 16px; }
+        .content { padding: 20px; overflow-y: auto; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 15px; }
+        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border-color); }
+        th { color: #6b7280; text-transform: uppercase; font-size: 11px; background: #f9fafb; }
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .tag.hot { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+        .tag.stable { background: #e0e7ff; color: #003087; border: 1px solid #a5b4fc; }
+
+        #toggle-btn {
+            position: absolute; top: 20px; left: 20px; z-index: 20;
+            background: #fff; border: 1px solid #ccc; padding: 10px 16px;
+            border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: none;
+        }
+
+        /* --- THANH CHUYỂN ĐỔI BẢN ĐỒ BÊN DƯỚI --- */
+        .map-style-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            background: #ffffff;
+            border-radius: 30px;
+            padding: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 1px solid #e5e7eb;
+        }
+        .style-btn {
+            background: transparent;
+            border: none;
+            padding: 8px 20px;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .style-btn:hover { color: #111827; }
+        .style-btn.active { background: var(--corporate-blue); color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .gmnoprint, .gm-style-cc { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <button id="toggle-btn" onclick="toggleSidebar()">☰ Hiển thị bảng dữ liệu</button>
+
+    <div id="sidebar">
+        <div class="header">
+            <h2>COLLATERAL DASHBOARD</h2>
+            <button onclick="toggleSidebar()" style="background:none;border:none;color:#fff;cursor:pointer;">✖</button>
+        </div>
+        <div class="content">
+            <div style="background:#f8fafc; border-left:4px solid var(--corporate-blue); padding:12px; margin-bottom:15px;">
+                <div style="font-size:12px; color:#6b7280; font-weight:600;">TỔNG GIÁ TRỊ (TỶ VNĐ)</div>
+                <div style="font-size:24px; font-weight:700;">1,450</div>
+            </div>
+            <table>
+                <thead><tr><th>Khu vực</th><th>Quy mô</th><th>Đánh giá</th></tr></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="map-style-controls">
+        <button class="style-btn active" id="btn-silver" onclick="changeMapStyle('silver')">Bản đồ Bạc (Chuẩn)</button>
+        <button class="style-btn" id="btn-dark" onclick="changeMapStyle('dark')">Bản đồ Tối (Sci-fi)</button>
+        <button class="style-btn" id="btn-satellite" onclick="changeMapStyle('satellite')">Vệ tinh thực tế</button>
+    </div>
+
+    <div id="map-container"></div>
+
+    <script>
+        let map; // Biến toàn cục để lưu instance Google Map
+
+        // Khai báo 2 bộ màu (JSON Array) cho bản đồ
+        const silverStyle = [
+            { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+            { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] }
+        ];
+
+        const darkStyle = [
+            { elementType: "geometry", stylers: [{ color: "#09101d" }] },
+            { elementType: "labels.text.stroke", stylers: [{ visibility: "off" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#45546b" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#040810" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ color: "#141c2b" }] },
+            { featureType: "poi", stylers: [{ visibility: "off" }] }
+        ];
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggle-btn');
+            sidebar.classList.toggle('hidden');
+            toggleBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
+        }
+
+        // Hàm xử lý khi bấm nút chuyển đổi Map
+        function changeMapStyle(mode) {
+            // Đổi trạng thái active cho các nút bấm
+            document.querySelectorAll('.style-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${mode}`).classList.add('active');
+
+            if (mode === 'silver') {
+                map.setMapTypeId('roadmap');
+                map.setOptions({ styles: silverStyle });
+            } else if (mode === 'dark') {
+                map.setMapTypeId('roadmap');
+                map.setOptions({ styles: darkStyle });
+            } else if (mode === 'satellite') {
+                map.setMapTypeId('satellite');
+                map.setOptions({ styles: null }); // Xóa lớp phủ màu để hiện ảnh vệ tinh
+            }
+        }
+
+        function initMap() {
+            const data = [
+                { name: 'Thảo Điền, Q2', coords: [106.7333, 10.8040], value: 450, risk: 85, trend: 'hot' },
+                { name: 'Tân Phong, Q7', coords: [106.7050, 10.7320], value: 350, risk: 30, trend: 'stable' },
+                { name: 'Bình Hưng, BC', coords: [106.6660, 10.7180], value: 200, risk: 75, trend: 'hot' }
+            ];
+
+            const tbody = document.getElementById('table-body');
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight:600;">${item.name}</td>
+                    <td>${item.value}</td>
+                    <td><span class="tag ${item.trend}">${item.trend === 'hot' ? 'Rủi ro' : 'Ổn định'}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Khởi tạo Google Maps (Mặc định dùng Silver Style)
+            map = new google.maps.Map(document.getElementById('map-container'), {
+                center: { lat: 10.7626, lng: 106.7000 },
+                zoom: 12.5, pitch: 50, bearing: 15,
+                mapTypeId: 'roadmap',
+                styles: silverStyle,
+                disableDefaultUI: true
+            });
+
+            // Lớp 3D (Deck.gl)
+            const columnLayer = new deck.ColumnLayer({
+                id: '3d-columns', data: data, diskResolution: 32, radius: 250,
+                extruded: true, elevationScale: 35,
+                getPosition: d => d.coords,
+                getFillColor: d => d.risk > 70 ? [220, 38, 38, 255] : [0, 48, 135, 240], 
+                getElevation: d => d.value,
+                material: { ambient: 0.8, diffuse: 0.8, shininess: 10, specularColor: [255, 255, 255] }
+            });
+
+            const overlay = new deck.GoogleMapsOverlay({
+                layers: [columnLayer],
+                effects: [new deck.LightingEffect({
+                    ambientLight: new deck.AmbientLight({ color: [255, 255, 255], intensity: 0.8 }),
+                    directionalLight: new deck.DirectionalLight({ color: [255, 255, 255], intensity: 1.0, direction: [-1, -3, -1] })
+                })]
+            });
+
+            overlay.setMap(map);
+        }
+    </script>
+    
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&loading=async&callback=initMap"></script>
+</body>
+</html>
