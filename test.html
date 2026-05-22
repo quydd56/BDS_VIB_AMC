@@ -3,31 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collateral Map - Multi-Style 3D</title>
-    <script src="https://unpkg.com/deck.gl@8.9.0/dist.min.js"></script>
-    <script src="https://unpkg.com/@deck.gl/google-maps@8.9.0/dist.min.js"></script>
+    <title>VIB Collateral Advanced 3D Map</title>
+    <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --corporate-blue: #003087;
             --text-main: #1f2937;
             --border-color: #e5e7eb;
-            --bg-panel: #ffffff;
+            --panel-bg: #ffffff;
         }
 
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
+            background: #f3f4f6;
         }
 
         #map-container { width: 100%; height: 100%; position: absolute; z-index: 1; }
 
-        /* Bảng điều khiển bên trái */
+        /* Sidebar điều khiển bên trái */
         #sidebar {
             position: absolute; top: 20px; left: 20px; bottom: 20px; width: 380px;
-            background: var(--bg-panel); border: 1px solid var(--border-color);
-            border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             z-index: 10; display: flex; flex-direction: column;
             transition: transform 0.3s ease;
         }
@@ -38,51 +38,35 @@
             padding: 16px 20px; border-radius: 6px 6px 0 0;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .header h2 { margin: 0; font-size: 16px; }
-        .content { padding: 20px; overflow-y: auto; }
-        
-        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 15px; }
-        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border-color); }
-        th { color: #6b7280; text-transform: uppercase; font-size: 11px; background: #f9fafb; }
-        .tag { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-        .tag.hot { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
-        .tag.stable { background: #e0e7ff; color: #003087; border: 1px solid #a5b4fc; }
+        .header h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; }
+        .content { padding: 20px; overflow-y: auto; flex: 1; }
+
+        .stat-box {
+            background: #f8fafc; border: 1px solid var(--border-color);
+            border-left: 4px solid var(--corporate-blue); padding: 12px; margin-bottom: 15px;
+        }
+        .stat-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
 
         #toggle-btn {
             position: absolute; top: 20px; left: 20px; z-index: 20;
-            background: #fff; border: 1px solid #ccc; padding: 10px 16px;
+            background: #fff; border: 1px solid var(--border-color); padding: 10px 16px;
             border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1); display: none;
         }
 
-        /* --- THANH CHUYỂN ĐỔI BẢN ĐỒ BÊN DƯỚI --- */
-        .map-style-controls {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-            display: flex;
-            background: #ffffff;
-            border-radius: 30px;
-            padding: 4px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            border: 1px solid #e5e7eb;
+        /* Tùy chỉnh giao diện Cụm (Cluster Icon) 3D phát sáng */
+        .custom-cluster-ico {
+            background: rgba(0, 48, 135, 0.85);
+            color: white; border: 2px solid #ffffff; border-radius: 50%;
+            font-weight: bold; font-size: 12px; display: flex;
+            align-items: center; justify-content: center;
+            box-shadow: 0 0 15px rgba(0, 48, 135, 0.6), inset 0 0 10px rgba(255,255,255,0.3);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
-        .style-btn {
-            background: transparent;
-            border: none;
-            padding: 8px 20px;
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 13px;
-            font-weight: 600;
-            color: #6b7280;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.2s;
+        .custom-cluster-ico.level-district {
+            background: rgba(220, 38, 38, 0.9); /* Màu đỏ cho cụm Quận nếu có rủi ro */
+            box-shadow: 0 0 15px rgba(220, 38, 38, 0.7);
         }
-        .style-btn:hover { color: #111827; }
-        .style-btn.active { background: var(--corporate-blue); color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
         .gmnoprint, .gm-style-cc { display: none !important; }
     </style>
@@ -93,32 +77,27 @@
 
     <div id="sidebar">
         <div class="header">
-            <h2>COLLATERAL DASHBOARD</h2>
-            <button onclick="toggleSidebar()" style="background:none;border:none;color:#fff;cursor:pointer;">✖</button>
+            <h2>COLLATERAL RISK SYSTEM</h2>
+            <button onclick="toggleSidebar()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:16px;">✖</button>
         </div>
         <div class="content">
-            <div style="background:#f8fafc; border-left:4px solid var(--corporate-blue); padding:12px; margin-bottom:15px;">
-                <div style="font-size:12px; color:#6b7280; font-weight:600;">TỔNG GIÁ TRỊ (TỶ VNĐ)</div>
-                <div style="font-size:24px; font-weight:700;">1,450</div>
+            <div class="stat-box">
+                <div style="font-size:11px; color:#6b7280; font-weight:600; text-transform:uppercase;">Cấp độ xem hiện tại</div>
+                <div id="current-level-text" style="font-size:18px; font-weight:700; color:var(--corporate-blue); margin-top:4px;">Thành Phố</div>
             </div>
-            <table>
-                <thead><tr><th>Khu vực</th><th>Quy mô</th><th>Đánh giá</th></tr></thead>
-                <tbody id="table-body"></tbody>
-            </table>
+            <div class="stat-box">
+                <div style="font-size:11px; color:#6b7280; font-weight:600; text-transform:uppercase;">Tổng danh mục khu vực quét</div>
+                <div class="stat-value">1,450 Tỷ</div>
+            </div>
+            <p style="font-size: 12px; color: #6b7280; line-height: 1.6; margin-top: 20px;">
+                💡 <b>Mẹo tương tác:</b> Hãy cuộn chuột (Zoom in) sâu xuống khu vực Quận 1 hoặc Bình Thạnh để xem các tòa nhà Landmark nổi khối 3D và các điểm tài sản tự động phân rã từ cấp Quận -> Phường -> Từng căn bất động sản.
+            </p>
         </div>
-    </div>
-
-    <div class="map-style-controls">
-        <button class="style-btn active" id="btn-silver" onclick="changeMapStyle('silver')">Bản đồ Bạc (Chuẩn)</button>
-        <button class="style-btn" id="btn-dark" onclick="changeMapStyle('dark')">Bản đồ Tối (Sci-fi)</button>
-        <button class="style-btn" id="btn-satellite" onclick="changeMapStyle('satellite')">Vệ tinh thực tế</button>
     </div>
 
     <div id="map-container"></div>
 
-<script>
-        let map; // Biến toàn cục để lưu instance Google Map
-
+    <script>
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const toggleBtn = document.getElementById('toggle-btn');
@@ -126,68 +105,124 @@
             toggleBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
         }
 
-        // Hàm xử lý khi bấm nút chuyển đổi Map (ĐÃ SỬA ĐỂ KHÔNG XUNG ĐỘT MAP ID)
-        function changeMapStyle(mode) {
-            document.querySelectorAll('.style-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`btn-${mode}`).classList.add('active');
-
-            // Khi dùng Map ID, mọi việc đổi màu phải cấu hình trên Cloud Console.
-            // Ở đây ta chỉ chuyển đổi loại bản đồ cơ bản.
-            if (mode === 'silver' || mode === 'dark') {
-                map.setMapTypeId('roadmap');
-            } else if (mode === 'satellite') {
-                map.setMapTypeId('satellite');
-            }
-        }
-
         function initMap() {
-            const data = [
-                { name: 'Thảo Điền, Q2', coords: [106.7333, 10.8040], value: 450, risk: 85, trend: 'hot' },
-                { name: 'Tân Phong, Q7', coords: [106.7050, 10.7320], value: 350, risk: 30, trend: 'stable' },
-                { name: 'Bình Hưng, BC', coords: [106.6660, 10.7180], value: 200, risk: 75, trend: 'hot' }
+            // Dữ liệu giả lập 3 cấp độ (Chi tiết cá thể tài sản) nằm tập trung ở TP.HCM
+            const collateralLocations = [
+                // Cụm Quận 1 - Phường Bến Nghé (Gần tòa Bitexco)
+                { lat: 10.7712, lng: 106.7042, name: "TSĐB #Q1-001 (Căn hộ chung cư cao cấp)", value: "150 Tỷ", level: "Asset" },
+                { lat: 10.7725, lng: 106.7058, name: "TSĐB #Q1-002 (Nhà phố mặt tiền thương mại)", value: "220 Tỷ", level: "Asset" },
+                { lat: 10.7701, lng: 106.7030, name: "TSĐB #Q1-003 (Tòa nhà văn phòng)", value: "480 Tỷ", level: "Asset" },
+                
+                // Cụm Bình Thạnh - Phường 22 (Gần tòa Landmark 81)
+                { lat: 10.7940, lng: 106.7215, name: "TSĐB #BT-001 (Biệt thự Vinhomes)", value: "310 Tỷ", level: "Asset" },
+                { lat: 10.7955, lng: 106.7230, name: "TSĐB #BT-002 (Căn hộ tầng cao Landmark)", value: "90 Tỷ", level: "Asset" },
+
+                // Cụm TP. Thủ Đức - Phường Thảo Điền
+                { lat: 10.8040, lng: 106.7333, name: "TSĐB #TD-001 (Bất động sản phức hợp)", value: "450 Tỷ", level: "Asset" },
+                { lat: 10.8055, lng: 106.7350, name: "TSĐB #TD-002 (Biệt thự ven sông)", value: "200 Tỷ", level: "Asset" }
             ];
 
-            const tbody = document.getElementById('table-body');
-            data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="font-weight:600;">${item.name}</td>
-                    <td>${item.value}</td>
-                    <td><span class="tag ${item.trend}">${item.trend === 'hot' ? 'Rủi ro' : 'Ổn định'}</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            // Khởi tạo Google Maps (ĐÃ XÓA THUỘC TÍNH STYLES)
+            // Khởi tạo bản đồ Vector Map ID. ĐÃ BỎ hoàn toàn thuộc tính style gây lỗi Permission để nhường chỗ cho 3D Landmark
             map = new google.maps.Map(document.getElementById('map-container'), {
-                center: { lat: 10.7626, lng: 106.7000 },
-                zoom: 13, // Tăng zoom lên một chút để dễ nhìn thấy các tòa nhà 3D
-                pitch: 55, // Tăng độ nghiêng lên 55 độ
-                bearing: 15,
-                mapId: '93c50cf0208605b41990395b',
-                mapTypeId: 'roadmap',
+                center: { lat: 10.7756, lng: 106.7010 }, // Tâm ở trung tâm TP.HCM
+                zoom: 12, 
+                pitch: 55,     // Góc nghiêng để nhìn thấy Landmark 3D đổ bóng
+                bearing: 30,   // Xoay nhẹ bản đồ để tăng không gian phối cảnh
+                mapId: '93c50cf0208605b41990395b', // Map ID Vector của bạn
                 disableDefaultUI: true
             });
 
-            // Lớp 3D (Deck.gl)
-            const columnLayer = new deck.ColumnLayer({
-                id: '3d-columns', data: data, diskResolution: 32, radius: 250,
-                extruded: true, elevationScale: 35,
-                getPosition: d => d.coords,
-                getFillColor: d => d.risk > 70 ? [220, 38, 38, 255] : [0, 48, 135, 240], 
-                getElevation: d => d.value,
-                material: { ambient: 0.8, diffuse: 0.8, shininess: 10, specularColor: [255, 255, 255] }
+            // --- LINK HÌNH ẢNH MARKER GIỌT NƯỚC 3D PHÁT SÁNG CỦA BẠN ---
+            // Sử dụng hình ảnh PNG trong suốt chất lượng cao tương tự mẫu IconScout bạn gửi
+            const pinIcon3D = {
+                url: 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?auto=format&fit=crop&w=60&q=80', // Ảnh fallback hoặc dùng icon ghim 3D chuyên dụng
+                // Để hiển thị đúng ghim giọt nước 3D của bạn, ta sử dụng Symbol hoặc link ảnh PNG dạng ghim 3D phát sáng:
+                url: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Ghim định vị tương đương hình giọt nước
+                scaledSize: new google.maps.Size(40, 40),
+                origin: new google.maps.Point(0, 0),
+                anchor: new google.maps.Point(20, 40)
+            };
+
+            // Tạo các Marker chi tiết
+            const markers = collateralLocations.map((loc) => {
+                const marker = new google.maps.Marker({
+                    position: { lat: loc.lat, lng: loc.lng },
+                    icon: pinIcon3D,
+                    title: loc.name
+                });
+
+                // Cửa sổ thông tin khi click vào điểm chi tiết tài sản
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `<div style="padding:10px; font-family:sans-serif; color:#111827;">
+                                <h4 style="margin:0 0 6px 0; color:#003087;">${loc.name}</h4>
+                                <p style="margin:0; font-size:13px;">Giá trị định giá: <b>${loc.value}</b></p>
+                                <p style="margin:4px 0 0 0; font-size:12px; color:#6b7280;">Phân loại: Tài sản nhóm 1</p>
+                              </div>`
+                });
+
+                marker.addListener("click", () => {
+                    infoWindow.open(map, marker);
+                });
+
+                return marker;
             });
 
-            const overlay = new deck.GoogleMapsOverlay({
-                layers: [columnLayer],
-                effects: [new deck.LightingEffect({
-                    ambientLight: new deck.AmbientLight({ color: [255, 255, 255], intensity: 0.8 }),
-                    directionalLight: new deck.DirectionalLight({ color: [255, 255, 255], intensity: 1.0, direction: [-1, -3, -1] })
-                })]
+            // --- XỬ LÝ GOM CỤM 3 CẤP ĐỘ THEO ĐỘ ZOOM (MARKER CLUSTERER) ---
+            const clusterRenderer = {
+                render: ({ count, position }) => {
+                    let currentZoom = map.getZoom();
+                    let size = 40 + Math.min(count, 10) * 2; // Kích thước tăng dần theo số lượng tài sản bị gộp
+                    let levelClass = "level-ward";
+                    
+                    // Thuật toán nhận diện cấp độ dựa trên độ sâu Zoom
+                    if (currentZoom <= 11) {
+                        levelClass = "level-city"; // Cấp Thành phố
+                    } else if (currentZoom > 11 && currentZoom <= 14) {
+                        levelClass = "level-district"; // Cấp Quận
+                    }
+
+                    return new google.maps.Marker({
+                        position,
+                        icon: { url: '' }, // Tắt icon mặc định để dùng div HTML phía dưới
+                        label: {
+                            text: String(count),
+                            color: "rgba(0,0,0,0)" // Ẩn text gốc
+                        },
+                        // Tạo khối tròn CSS phát sáng tùy biến
+                        content: document.createElement('div'), 
+                        zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
+                    });
+                }
+            };
+
+            // Cấu hình lõi gom cụm nâng cao
+            const markerCluster = new markerClusterer.MarkerClusterer({
+                map,
+                markers,
+                algorithm: new markerClusterer.GridAlgorithm({ gridSize: 60 })
             });
 
-            overlay.setMap(map);
+            // Tùy biến hiển thị nhãn số lượng tài sản dạng hình cầu 3D lơ lửng cho các cụm gộp
+            markerCluster.onClusterClick = (event, cluster, map) => {
+                map.fitBounds(cluster.bounds);
+            };
+
+            // --- LẮNG NGHE ĐỘ ZOOM ĐỂ ĐỔI TEXT TRẠNG THÁI TRÊN SIDEBAR ---
+            map.addListener("zoom_changed", () => {
+                const zoom = map.getZoom();
+                const levelText = document.getElementById("current-level-text");
+                
+                if (zoom <= 11) {
+                    levelText.innerText = "Cấp 1: THÀNH PHỐ (Gom cụm vĩ mỗ)";
+                    levelText.style.color = "#003087";
+                } else if (zoom > 11 && zoom <= 14) {
+                    levelText.innerText = "Cấp 2: QUẬN / HUYỆN (Gom cụm phân khu)";
+                    levelText.style.color = "#d97706";
+                } else {
+                    levelText.innerText = "Cấp 3: CHI TIẾT PHƯỜNG / TÀI SẢN";
+                    levelText.style.color = "#0f766e";
+                }
+            });
         }
     </script>
     
