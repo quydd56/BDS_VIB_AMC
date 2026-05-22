@@ -54,6 +54,28 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.1); display: none;
         }
 
+        /* --- THANH CHUYỂN ĐỔI BẢN ĐỒ BÊN DƯỚI --- */
+        .map-style-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            background: #ffffff;
+            border-radius: 30px;
+            padding: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 1px solid #e5e7eb;
+        }
+        .style-btn {
+            background: transparent; border: none; padding: 8px 20px;
+            font-family: 'Segoe UI', sans-serif; font-size: 13px; font-weight: 600;
+            color: #6b7280; border-radius: 20px; cursor: pointer; transition: all 0.2s;
+        }
+        .style-btn:hover { color: #111827; }
+        .style-btn.active { background: var(--corporate-blue); color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
         /* Tùy chỉnh giao diện Cụm (Cluster Icon) 3D phát sáng */
         .custom-cluster-ico {
             background: rgba(0, 48, 135, 0.85);
@@ -62,10 +84,6 @@
             align-items: center; justify-content: center;
             box-shadow: 0 0 15px rgba(0, 48, 135, 0.6), inset 0 0 10px rgba(255,255,255,0.3);
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-        }
-        .custom-cluster-ico.level-district {
-            background: rgba(220, 38, 38, 0.9); /* Màu đỏ cho cụm Quận nếu có rủi ro */
-            box-shadow: 0 0 15px rgba(220, 38, 38, 0.7);
         }
 
         .gmnoprint, .gm-style-cc { display: none !important; }
@@ -90,14 +108,22 @@
                 <div class="stat-value">1,450 Tỷ</div>
             </div>
             <p style="font-size: 12px; color: #6b7280; line-height: 1.6; margin-top: 20px;">
-                💡 <b>Mẹo tương tác:</b> Hãy cuộn chuột (Zoom in) sâu xuống khu vực Quận 1 hoặc Bình Thạnh để xem các tòa nhà Landmark nổi khối 3D và các điểm tài sản tự động phân rã từ cấp Quận -> Phường -> Từng căn bất động sản.
+                💡 <b>Mẹo tương tác:</b> Hãy cuộn chuột (Zoom in) sâu xuống khu vực Quận 1 hoặc Bình Thạnh để xem các điểm tài sản tự động phân rã từ cấp Quận -> Phường -> Từng căn bất động sản.
             </p>
         </div>
+    </div>
+
+    <div class="map-style-controls">
+        <button class="style-btn active" id="btn-roadmap" onclick="changeMapStyle('roadmap')">Bản đồ Chuẩn</button>
+        <button class="style-btn" id="btn-terrain" onclick="changeMapStyle('terrain')">Địa hình</button>
+        <button class="style-btn" id="btn-satellite" onclick="changeMapStyle('satellite')">Vệ tinh thực tế</button>
     </div>
 
     <div id="map-container"></div>
 
     <script>
+        let map;
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const toggleBtn = document.getElementById('toggle-btn');
@@ -105,45 +131,49 @@
             toggleBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
         }
 
-        function initMap() {
-            // Dữ liệu giả lập 3 cấp độ (Chi tiết cá thể tài sản) nằm tập trung ở TP.HCM
-            const collateralLocations = [
-                // Cụm Quận 1 - Phường Bến Nghé (Gần tòa Bitexco)
-                { lat: 10.7712, lng: 106.7042, name: "TSĐB #Q1-001 (Căn hộ chung cư cao cấp)", value: "150 Tỷ", level: "Asset" },
-                { lat: 10.7725, lng: 106.7058, name: "TSĐB #Q1-002 (Nhà phố mặt tiền thương mại)", value: "220 Tỷ", level: "Asset" },
-                { lat: 10.7701, lng: 106.7030, name: "TSĐB #Q1-003 (Tòa nhà văn phòng)", value: "480 Tỷ", level: "Asset" },
-                
-                // Cụm Bình Thạnh - Phường 22 (Gần tòa Landmark 81)
-                { lat: 10.7940, lng: 106.7215, name: "TSĐB #BT-001 (Biệt thự Vinhomes)", value: "310 Tỷ", level: "Asset" },
-                { lat: 10.7955, lng: 106.7230, name: "TSĐB #BT-002 (Căn hộ tầng cao Landmark)", value: "90 Tỷ", level: "Asset" },
+        // Hàm xử lý đổi loại bản đồ
+        function changeMapStyle(mode) {
+            document.querySelectorAll('.style-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${mode}`).classList.add('active');
+            
+            // Chuyển đổi trực tiếp thông qua mapTypeId
+            map.setMapTypeId(mode);
+        }
 
-                // Cụm TP. Thủ Đức - Phường Thảo Điền
-                { lat: 10.8040, lng: 106.7333, name: "TSĐB #TD-001 (Bất động sản phức hợp)", value: "450 Tỷ", level: "Asset" },
-                { lat: 10.8055, lng: 106.7350, name: "TSĐB #TD-002 (Biệt thự ven sông)", value: "200 Tỷ", level: "Asset" }
+        function initMap() {
+            const collateralLocations = [
+                // Cụm Quận 1
+                { lat: 10.7712, lng: 106.7042, name: "TSĐB #Q1-001 (Căn hộ chung cư cao cấp)", value: "150 Tỷ" },
+                { lat: 10.7725, lng: 106.7058, name: "TSĐB #Q1-002 (Nhà phố mặt tiền thương mại)", value: "220 Tỷ" },
+                { lat: 10.7701, lng: 106.7030, name: "TSĐB #Q1-003 (Tòa nhà văn phòng)", value: "480 Tỷ" },
+                
+                // Cụm Bình Thạnh
+                { lat: 10.7940, lng: 106.7215, name: "TSĐB #BT-001 (Biệt thự Vinhomes)", value: "310 Tỷ" },
+                { lat: 10.7955, lng: 106.7230, name: "TSĐB #BT-002 (Căn hộ tầng cao Landmark)", value: "90 Tỷ" },
+
+                // Cụm TP. Thủ Đức
+                { lat: 10.8040, lng: 106.7333, name: "TSĐB #TD-001 (Bất động sản phức hợp)", value: "450 Tỷ" },
+                { lat: 10.8055, lng: 106.7350, name: "TSĐB #TD-002 (Biệt thự ven sông)", value: "200 Tỷ" }
             ];
 
-            // Khởi tạo bản đồ Vector Map ID. ĐÃ BỎ hoàn toàn thuộc tính style gây lỗi Permission để nhường chỗ cho 3D Landmark
             map = new google.maps.Map(document.getElementById('map-container'), {
-                center: { lat: 10.7756, lng: 106.7010 }, // Tâm ở trung tâm TP.HCM
-                zoom: 16, 
-                pitch: 55,     // Góc nghiêng để nhìn thấy Landmark 3D đổ bóng
-                bearing: 30,   // Xoay nhẹ bản đồ để tăng không gian phối cảnh
-                mapId: '93c50cf0208605b41990395b', // Map ID Vector của bạn
+                center: { lat: 10.7756, lng: 106.7010 },
+                zoom: 12, 
+                pitch: 55,     
+                bearing: 30,   
+                mapId: '93c50cf0208605b41990395b', 
+                mapTypeId: 'roadmap', // Mặc định là Bản đồ chuẩn
                 disableDefaultUI: true
             });
 
-            // --- LINK HÌNH ẢNH MARKER GIỌT NƯỚC 3D PHÁT SÁNG CỦA BẠN ---
-            // Sử dụng hình ảnh PNG trong suốt chất lượng cao tương tự mẫu IconScout bạn gửi
+            // Sử dụng hình ảnh PNG trong suốt
             const pinIcon3D = {
-                url: 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?auto=format&fit=crop&w=60&q=80', // Ảnh fallback hoặc dùng icon ghim 3D chuyên dụng
-                // Để hiển thị đúng ghim giọt nước 3D của bạn, ta sử dụng Symbol hoặc link ảnh PNG dạng ghim 3D phát sáng:
-                url: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Ghim định vị tương đương hình giọt nước
+                url: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', 
                 scaledSize: new google.maps.Size(40, 40),
                 origin: new google.maps.Point(0, 0),
                 anchor: new google.maps.Point(20, 40)
             };
 
-            // Tạo các Marker chi tiết
             const markers = collateralLocations.map((loc) => {
                 const marker = new google.maps.Marker({
                     position: { lat: loc.lat, lng: loc.lng },
@@ -151,7 +181,6 @@
                     title: loc.name
                 });
 
-                // Cửa sổ thông tin khi click vào điểm chi tiết tài sản
                 const infoWindow = new google.maps.InfoWindow({
                     content: `<div style="padding:10px; font-family:sans-serif; color:#111827;">
                                 <h4 style="margin:0 0 6px 0; color:#003087;">${loc.name}</h4>
@@ -167,59 +196,39 @@
                 return marker;
             });
 
-            // --- XỬ LÝ GOM CỤM 3 CẤP ĐỘ THEO ĐỘ ZOOM (MARKER CLUSTERER) ---
             const clusterRenderer = {
                 render: ({ count, position }) => {
-                    let currentZoom = map.getZoom();
-                    let size = 40 + Math.min(count, 10) * 2; // Kích thước tăng dần theo số lượng tài sản bị gộp
-                    let levelClass = "level-ward";
-                    
-                    // Thuật toán nhận diện cấp độ dựa trên độ sâu Zoom
-                    if (currentZoom <= 11) {
-                        levelClass = "level-city"; // Cấp Thành phố
-                    } else if (currentZoom > 11 && currentZoom <= 14) {
-                        levelClass = "level-district"; // Cấp Quận
-                    }
-
                     return new google.maps.Marker({
                         position,
-                        icon: { url: '' }, // Tắt icon mặc định để dùng div HTML phía dưới
+                        icon: { url: '' }, 
                         label: {
                             text: String(count),
-                            color: "rgba(0,0,0,0)" // Ẩn text gốc
+                            color: "rgba(0,0,0,0)" 
                         },
-                        // Tạo khối tròn CSS phát sáng tùy biến
                         content: document.createElement('div'), 
                         zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
                     });
                 }
             };
 
-            // Cấu hình lõi gom cụm nâng cao
             const markerCluster = new markerClusterer.MarkerClusterer({
                 map,
                 markers,
                 algorithm: new markerClusterer.GridAlgorithm({ gridSize: 60 })
             });
 
-            // Tùy biến hiển thị nhãn số lượng tài sản dạng hình cầu 3D lơ lửng cho các cụm gộp
-            markerCluster.onClusterClick = (event, cluster, map) => {
-                map.fitBounds(cluster.bounds);
-            };
-
-            // --- LẮNG NGHE ĐỘ ZOOM ĐỂ ĐỔI TEXT TRẠNG THÁI TRÊN SIDEBAR ---
             map.addListener("zoom_changed", () => {
                 const zoom = map.getZoom();
                 const levelText = document.getElementById("current-level-text");
                 
                 if (zoom <= 11) {
-                    levelText.innerText = "Cấp 1: THÀNH PHỐ (Gom cụm vĩ mỗ)";
+                    levelText.innerText = "Cấp 1: THÀNH PHỐ";
                     levelText.style.color = "#003087";
                 } else if (zoom > 11 && zoom <= 14) {
-                    levelText.innerText = "Cấp 2: QUẬN / HUYỆN (Gom cụm phân khu)";
+                    levelText.innerText = "Cấp 2: QUẬN / HUYỆN";
                     levelText.style.color = "#d97706";
                 } else {
-                    levelText.innerText = "Cấp 3: CHI TIẾT PHƯỜNG / TÀI SẢN";
+                    levelText.innerText = "Cấp 3: CHI TIẾT TÀI SẢN";
                     levelText.style.color = "#0f766e";
                 }
             });
